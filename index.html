@@ -63,6 +63,7 @@ main{padding:16px 18px;max-width:1600px;margin:0 auto}
 .rm{position:absolute;top:4px;right:4px;border:none;background:none;color:var(--bad);padding:0 5px;font-size:14px;line-height:1.2}
 .rm:hover{background:var(--bad-soft)}
 
+.stickyctl{position:sticky;top:var(--hh,60px);z-index:6;background:var(--bg);padding:2px 0 6px}
 .back{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
 .back h2{font-size:15px;margin:0 6px 0 0}
 .filters{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;box-shadow:var(--shadow)}
@@ -287,7 +288,16 @@ function render(){
   if(current !== "overview" && !sheets.find(s => s.name === current)) current = "overview";
   view.innerHTML = current === "overview" ? overview() : sheetView(current);
   bind();
+  fit();
 }
+
+function fit(){
+  const hd = document.querySelector('header');
+  document.documentElement.style.setProperty('--hh', hd.offsetHeight + 'px');
+  const w = document.querySelector('.tablewrap');
+  if(w){ const top = w.getBoundingClientRect().top; w.style.maxHeight = Math.max(240, window.innerHeight - top - 24) + 'px'; }
+}
+window.addEventListener('resize', fit);
 
 function emptyState(){
   return '<div class="empty"><h2 style="margin-top:0">No sheets yet</h2><ol>' +
@@ -371,9 +381,9 @@ function sheetView(name){
 
   const head = d.cols.map((c, k) => '<th class="' + (d.types[k] === "number" ? "num" : "") + '" data-sort="' + k + '">' + esc(c) + (st && st.col === k ? (st.dir === 1 ? " ▲" : " ▼") : "") + '</th>').join("");
   const body = shown.map(r => "<tr>" + r.map((c, k) => '<td class="' + (d.types[k] === "number" ? "num" : "") + '">' + esc(c) + "</td>").join("") + "</tr>").join("");
-  return top +
+  return '<div class="stickyctl">' + top +
     '<div class="filters">' + dateBox + '<input type="search" id="q" placeholder="Search in ' + esc(name) + '" value="' + esc(search) + '" aria-label="Search rows">' + selects +
-    '<span class="meta">' + rows.length.toLocaleString() + ' of ' + d.rows.length.toLocaleString() + ' rows · updated ' + (d.time ? d.time.toLocaleTimeString() : "") + '</span></div>' +
+    '<span class="meta">' + rows.length.toLocaleString() + ' of ' + d.rows.length.toLocaleString() + ' rows · updated ' + (d.time ? d.time.toLocaleTimeString() : "") + '</span></div></div>' +
     (d.error ? '<div class="err-text" style="margin-bottom:8px">Last refresh failed: ' + esc(d.error) + ' Showing earlier data.</div>' : "") +
     '<div class="tablewrap"><table><thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table>' +
     (rows.length ? "" : '<div class="noRows">No rows for the selected dates. Click All to see every row.</div>') + '</div>' +
