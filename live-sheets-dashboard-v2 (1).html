@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live Sheets Dashboard</title>
+<style>
+:root{--bg:#f3f5f4;--panel:#fff;--ink:#16231f;--muted:#62706b;--line:#dde3e0;--accent:#0f6b5c;--accent-soft:#e1f0ec;--warn:#b4540a;--warn-soft:#fbeadb;--bad:#b3261e;--ok:#1f8a4c}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.45}
+header{background:var(--panel);border-bottom:1px solid var(--line);padding:14px 20px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:5}
+h1{font-size:18px;margin:0;font-weight:600}
+.sub{color:var(--muted);font-size:13px}
+.tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+button,select,input{font:inherit}
+button{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:7px 12px;border-radius:6px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button:focus-visible,select:focus-visible,input:focus-visible,.card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+select,input[type=text],input[type=search]{border:1px solid var(--line);border-radius:6px;padding:7px 10px;background:#fff;color:var(--ink)}
+nav{display:flex;gap:6px;overflow-x:auto;padding:12px 20px 0;border-bottom:1px solid var(--line);background:var(--panel)}
+.tab{border:none;border-bottom:3px solid transparent;border-radius:0;background:none;padding:9px 12px;white-space:nowrap;color:var(--muted);display:flex;align-items:center;gap:7px}
+.tab.active{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+.dot.ok{background:var(--ok)}.dot.err{background:var(--bad)}.dot.stale{background:var(--warn)}
+main{padding:20px;max-width:1500px;margin:0 auto}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;cursor:pointer}
+.card:hover{border-color:var(--accent)}
+.card h3{margin:0 0 4px;font-size:16px;display:flex;justify-content:space-between;gap:8px}
+.big{font-size:30px;font-weight:600;color:var(--accent);margin:6px 0 2px}
+.meta{color:var(--muted);font-size:13px}
+.err-text{color:var(--bad);font-size:13px;margin-top:6px}
+.badge{display:inline-block;background:var(--warn-soft);color:var(--warn);border-radius:4px;padding:1px 7px;font-size:12px;margin-top:6px}
+.badge.ok{background:var(--accent-soft);color:var(--accent)}
+.summary{display:flex;gap:28px;flex-wrap:wrap;margin-bottom:18px}
+.summary div b{display:block;font-size:26px;font-weight:600}
+.summary div span{color:var(--muted);font-size:13px}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.bar input[type=search]{flex:1;min-width:180px;max-width:320px}
+.tablewrap{background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:auto;max-height:70vh}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{position:sticky;top:0;background:#eef2f0;cursor:pointer;font-weight:600;user-select:none}
+th:hover{background:var(--accent-soft)}
+tbody tr:nth-child(even){background:#fafbfa}
+.num{text-align:right}
+.empty{background:var(--panel);border:1px dashed var(--line);border-radius:8px;padding:24px;max-width:680px}
+.empty ol{padding-left:20px;margin:10px 0}
+.more{margin:12px 0;text-align:center}
+.removebtn{color:var(--bad);border-color:transparent;padding:2px 6px;font-size:13px}
+dialog{border:1px solid var(--line);border-radius:10px;padding:20px;width:min(540px,92vw)}
+dialog::backdrop{background:rgba(0,0,0,.35)}
+dialog label{display:block;margin:12px 0 4px;font-weight:500}
+dialog input{width:100%}
+.row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+@media(max-width:600px){main{padding:12px}header{padding:12px}nav{padding:8px 12px 0}}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Live Sheets Dashboard</h1>
+    <div class="sub" id="status">Loading...</div>
+  </div>
+  <div class="tools">
+    <label class="sub" for="interval">Auto refresh</label>
+    <select id="interval">
+      <option value="0">Off</option>
+      <option value="60">1 min</option>
+      <option value="300" selected>5 min</option>
+      <option value="900">15 min</option>
+    </select>
+    <button id="refreshBtn">Refresh now</button>
+    <button class="primary" id="addBtn">Add sheet</button>
+  </div>
+</header>
+<nav id="tabs" aria-label="Sheets"></nav>
+<main id="view"></main>
+
+<dialog id="dlg">
+  <h2 style="margin:0 0 4px;font-size:17px">Add a Google Sheet</h2>
+  <div class="sub">Use the link from File, Share, Publish to web, with format set to CSV.</div>
+  <label for="nm">Display name</label>
+  <input type="text" id="nm" placeholder="e.g. Closing">
+  <label for="ul">Published CSV link</label>
+  <input type="text" id="ul" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv">
+  <div class="err-text" id="dlgErr"></div>
+  <div class="row"><button id="cancelBtn">Cancel</button><button class="primary" id="saveBtn">Save sheet</button></div>
+</dialog>
+
+<script>
+/* Sheets shown the first time you open this file. You can add or remove more with the buttons. */
+const DEFAULT_SHEETS = [
+  { name: "Closing", url: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTWTzABYNV_ISTxQcSpIfYfHxgJOm3bvKIEo0mmWmi1Qj_h5Cujf7_dclucFZmTgXP__kK9iCouAXkT/pub?gid=0&single=true&output=csv" }
+];
+
+const STORE = "liveSheetsDashboard.v2";
+const PAGE = 300;
+let sheets = loadSheets();
+let data = {};
+let current = "overview";
+let sortState = {}, filters = {}, limit = {}, search = "";
+let timer = null;
+
+function loadSheets(){
+  try{ const s = JSON.parse(localStorage.getItem(STORE) || "null"); if(Array.isArray(s)) return s; }catch(e){}
+  return DEFAULT_SHEETS.slice();
+}
+function saveSheets(){ try{ localStorage.setItem(STORE, JSON.stringify(sheets)); }catch(e){} }
+const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- CSV + helpers ---------- */
+function parseCSV(t){
+  const rows = []; let row = [], f = "", q = false;
+  for(let i = 0; i < t.length; i++){
+    const c = t[i];
+    if(q){ if(c === '"'){ if(t[i+1] === '"'){ f += '"'; i++; } else q = false; } else f += c; }
+    else if(c === '"') q = true;
+    else if(c === ","){ row.push(f); f = ""; }
+    else if(c === "\n" || c === "\r"){ if(c === "\r" && t[i+1] === "\n") i++; row.push(f); rows.push(row); row = []; f = ""; }
+    else f += c;
+  }
+  if(f !== "" || row.length){ row.push(f); rows.push(row); }
+  return rows;
+}
+const DATE_RE = /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/;
+function dateVal(s){
+  const m = String(s).trim().match(DATE_RE);
+  return m ? new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)).getTime() : null;
+}
+function numVal(s){
+  const t = String(s).trim().replace(/,/g, "");
+  return /^-?\d*\.?\d+$/.test(t) ? parseFloat(t) : null;
+}
+function sameDay(ms, d){ const a = new Date(ms); return a.getFullYear() === d.getFullYear() && a.getMonth() === d.getMonth() && a.getDate() === d.getDate(); }
+function fmtDate(ms){ return new Date(ms).toLocaleString([], { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }); }
+
+function build(text){
+  const all = parseCSV(text).filter(r => r.some(c => c.trim() !== ""));
+  if(!all.length) return { cols: [], rows: [], types: [] };
+  const head = all[0].map((h, i) => h.trim() || ("Column " + (i + 1)));
+  const body = all.slice(1);
+  const keep = head.map((h, i) => !/^image/i.test(h) && body.some(r => (r[i] || "").trim() !== ""));
+  const cols = head.filter((_, i) => keep[i]);
+  const rows = body.map(r => head.map((_, i) => (r[i] || "").trim()).filter((_, i) => keep[i]));
+  const types = cols.map((_, c) => {
+    const vals = rows.map(r => r[c]).filter(v => v !== "");
+    if(!vals.length) return "text";
+    if(vals.every(v => numVal(v) !== null)) return "number";
+    if(vals.filter(v => dateVal(v) !== null).length / vals.length > 0.8) return "date";
+    return "text";
+  });
+  const dateCol = (() => { let i = cols.findIndex((c, k) => types[k] === "date" && /timestamp/i.test(c)); return i >= 0 ? i : types.indexOf("date"); })();
+  const filterCols = cols.map((c, k) => {
+    if(types[k] === "number" || /^id$/i.test(c)) return false;
+    const set = new Set(rows.map(r => r[k]).filter(v => v !== ""));
+    return set.size > 1 && set.size <= 30;
+  });
+  return { cols, rows, types, dateCol, filterCols };
+}
+
+/* ---------- Loading ---------- */
+async function loadOne(s){
+  const sep = s.url.includes("?") ? "&" : "?";
+  const res = await fetch(s.url + sep + "_=" + Date.now(), { cache: "no-store" });
+  if(!res.ok) throw new Error("Could not open the link (error " + res.status + "). Check that it is published as CSV.");
+  const text = await res.text();
+  if(/^\s*<(!doctype|html)/i.test(text)) throw new Error("The link did not return CSV data. Publish the sheet to web with format CSV.");
+  return build(text);
+}
+async function refreshAll(){
+  document.getElementById("status").textContent = "Refreshing...";
+  await Promise.all(sheets.map(async s => {
+    try{ data[s.name] = Object.assign(await loadOne(s), { time: new Date(), error: null }); }
+    catch(e){ data[s.name] = Object.assign({}, data[s.name], { error: (e && e.message && e.message !== "Failed to fetch") ? e.message : "Could not load. Check your internet and the published link." }); }
+  }));
+  document.getElementById("status").textContent = sheets.length ? "Last refreshed " + new Date().toLocaleTimeString() : "No sheets added yet";
+  render();
+}
+function setTimer(){
+  clearInterval(timer);
+  const sec = +document.getElementById("interval").value;
+  if(sec) timer = setInterval(refreshAll, sec * 1000);
+}
+
+/* ---------- Rendering ---------- */
+function latest(d){
+  if(!d || !d.rows || d.dateCol == null || d.dateCol < 0) return null;
+  let m = 0; d.rows.forEach(r => { const v = dateVal(r[d.dateCol]); if(v && v > m) m = v; });
+  return m || null;
+}
+function todayCount(d){
+  if(!d || !d.rows || d.dateCol == null || d.dateCol < 0) return 0;
+  const t = new Date(); let n = 0;
+  d.rows.forEach(r => { const v = dateVal(r[d.dateCol]); if(v && sameDay(v, t)) n++; });
+  return n;
+}
+function dotClass(name){
+  const d = data[name];
+  if(!d) return "stale";
+  if(d.error && !d.rows) return "err";
+  if(d.dateCol >= 0 && d.dateCol != null) return todayCount(d) ? "ok" : "stale";
+  return d.error ? "err" : "ok";
+}
+
+function render(){
+  const t = document.getElementById("tabs");
+  t.innerHTML = '<button class="tab ' + (current === "overview" ? "active" : "") + '" data-tab="overview">Overview</button>' +
+    sheets.map(s => '<button class="tab ' + (current === s.name ? "active" : "") + '" data-tab="' + esc(s.name) + '"><span class="dot ' + dotClass(s.name) + '"></span>' + esc(s.name) + '</button>').join("");
+  t.querySelectorAll(".tab").forEach(b => b.onclick = () => { current = b.dataset.tab; search = ""; render(); });
+  const view = document.getElementById("view");
+  if(!sheets.length){ view.innerHTML = emptyState(); return; }
+  if(current !== "overview" && !sheets.find(s => s.name === current)) current = "overview";
+  view.innerHTML = current === "overview" ? overview() : sheetView(current);
+  bind();
+}
+
+function emptyState(){
+  return '<div class="empty"><h2 style="margin-top:0">Add your first sheet</h2><ol>' +
+    '<li>Open the Google Sheet, click File, Share, then Publish to web.</li>' +
+    '<li>Choose the tab and the format Comma-separated values (.csv), then Publish.</li>' +
+    '<li>Copy the link and paste it with Add sheet.</li></ol>' +
+    '<div class="meta">The first row is used as the column headings. Data reloads automatically.</div></div>';
+}
+
+function overview(){
+  let total = 0, quiet = 0, bad = 0;
+  sheets.forEach(s => { const d = data[s.name]; if(d && d.rows) total += d.rows.length; if(d && d.error) bad++; else if(d && d.dateCol >= 0 && !todayCount(d)) quiet++; });
+  let h = '<div class="summary"><div><b>' + sheets.length + '</b><span>Sheets connected</span></div>' +
+    '<div><b>' + total.toLocaleString() + '</b><span>Total rows</span></div>' +
+    '<div><b style="color:' + (quiet ? "var(--warn)" : "inherit") + '">' + quiet + '</b><span>No entry today</span></div>' +
+    '<div><b style="color:' + (bad ? "var(--bad)" : "inherit") + '">' + bad + '</b><span>Errors</span></div></div><div class="grid">';
+  sheets.forEach(s => {
+    const d = data[s.name] || {}; const l = latest(d); const tc = todayCount(d);
+    h += '<div class="card" tabindex="0" role="button" data-open="' + esc(s.name) + '"><h3><span>' + esc(s.name) + '</span>' +
+      '<button class="removebtn" data-remove="' + esc(s.name) + '">Remove</button></h3>' +
+      '<div class="big">' + (d.rows ? d.rows.length.toLocaleString() : (d.error ? "-" : "...")) + '</div>' +
+      '<div class="meta">rows' + (d.cols ? " in " + d.cols.length + " columns" : "") + '</div>' +
+      (l ? '<div class="meta">Latest entry: ' + fmtDate(l) + '</div>' : '') +
+      (d.rows && d.dateCol >= 0 ? (tc ? '<span class="badge ok">' + tc + ' entries today</span>' : '<span class="badge">No entry today</span>') : '') +
+      (d.error ? '<div class="err-text">' + esc(d.error) + '</div>' : '') + '</div>';
+  });
+  return h + '</div>';
+}
+
+function sheetView(name){
+  const d = data[name];
+  if(!d) return '<div class="meta">Loading ' + esc(name) + '...</div>';
+  if(!d.rows) return '<div class="empty"><b>' + esc(name) + '</b><div class="err-text">' + esc(d.error) + '</div></div>';
+  const f = filters[name] = filters[name] || {};
+  let rows = d.rows.map(r => r);
+  Object.keys(f).forEach(c => { if(f[c]) rows = rows.filter(r => r[c] === f[c]); });
+  if(search){ const q = search.toLowerCase(); rows = rows.filter(r => r.some(c => c.toLowerCase().includes(q))); }
+  let st = sortState[name];
+  if(!st && d.dateCol >= 0) st = sortState[name] = { col: d.dateCol, dir: -1 };
+  if(st){
+    const ty = d.types[st.col];
+    const key = v => ty === "date" ? (dateVal(v) || 0) : ty === "number" ? (numVal(v) || 0) : v.toLowerCase();
+    rows = rows.slice().sort((a, b) => { const A = key(a[st.col]), B = key(b[st.col]); return (A > B ? 1 : A < B ? -1 : 0) * st.dir; });
+  }
+  const shown = rows.slice(0, limit[name] || PAGE);
+  const selects = d.cols.map((c, k) => {
+    if(!d.filterCols[k]) return "";
+    const vals = Array.from(new Set(d.rows.map(r => r[k]).filter(v => v !== ""))).sort((a, b) => d.types[k] === "date" ? dateVal(b) - dateVal(a) : a.localeCompare(b));
+    return '<select data-filter="' + k + '" aria-label="Filter by ' + esc(c) + '"><option value="">All ' + esc(c) + '</option>' +
+      vals.map(v => '<option value="' + esc(v) + '"' + (f[k] === v ? " selected" : "") + '>' + esc(v) + '</option>').join("") + '</select>';
+  }).join("");
+  const head = d.cols.map((c, k) => '<th class="' + (d.types[k] === "number" ? "num" : "") + '" data-sort="' + k + '">' + esc(c) + (st && st.col === k ? (st.dir === 1 ? " ▲" : " ▼") : "") + '</th>').join("");
+  const body = shown.map(r => "<tr>" + r.map((c, k) => '<td class="' + (d.types[k] === "number" ? "num" : "") + '">' + esc(c) + "</td>").join("") + "</tr>").join("");
+  return '<div class="bar"><input type="search" id="q" placeholder="Search in ' + esc(name) + '" value="' + esc(search) + '" aria-label="Search rows">' + selects +
+    '<span class="meta">' + rows.length.toLocaleString() + ' of ' + d.rows.length.toLocaleString() + ' rows · updated ' + (d.time ? d.time.toLocaleTimeString() : "") + '</span></div>' +
+    (d.error ? '<div class="err-text" style="margin-bottom:8px">Last refresh failed: ' + esc(d.error) + ' Showing earlier data.</div>' : "") +
+    '<div class="tablewrap"><table><thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table></div>' +
+    (rows.length > shown.length ? '<div class="more"><button id="moreBtn">Show more rows (' + (rows.length - shown.length).toLocaleString() + ' left)</button></div>' : "");
+}
+
+function bind(){
+  document.querySelectorAll("[data-open]").forEach(c => {
+    const go = () => { current = c.dataset.open; render(); };
+    c.onclick = go; c.onkeydown = e => { if(e.key === "Enter") go(); };
+  });
+  document.querySelectorAll("[data-remove]").forEach(b => b.onclick = e => {
+    e.stopPropagation(); const n = b.dataset.remove;
+    if(confirm("Remove " + n + " from the dashboard? The Google Sheet itself is not changed.")){ sheets = sheets.filter(s => s.name !== n); delete data[n]; saveSheets(); render(); }
+  });
+  document.querySelectorAll("[data-sort]").forEach(h => h.onclick = () => {
+    const col = +h.dataset.sort, cur = sortState[current];
+    sortState[current] = { col, dir: cur && cur.col === col ? -cur.dir : 1 }; render();
+  });
+  document.querySelectorAll("[data-filter]").forEach(s => s.onchange = () => {
+    filters[current] = filters[current] || {}; filters[current][s.dataset.filter] = s.value; limit[current] = PAGE; render();
+  });
+  const more = document.getElementById("moreBtn");
+  if(more) more.onclick = () => { limit[current] = (limit[current] || PAGE) + PAGE; render(); };
+  const q = document.getElementById("q");
+  if(q) q.oninput = () => {
+    search = q.value; const pos = q.selectionStart; render();
+    const nq = document.getElementById("q"); nq.focus(); nq.setSelectionRange(pos, pos);
+  };
+}
+
+/* ---------- Add sheet ---------- */
+const dlg = document.getElementById("dlg");
+document.getElementById("addBtn").onclick = () => { document.getElementById("dlgErr").textContent = ""; dlg.showModal(); };
+document.getElementById("cancelBtn").onclick = () => dlg.close();
+document.getElementById("saveBtn").onclick = () => {
+  const name = document.getElementById("nm").value.trim();
+  const url = document.getElementById("ul").value.trim();
+  const err = document.getElementById("dlgErr");
+  if(!name){ err.textContent = "Enter a display name."; return; }
+  if(!/^https:\/\/docs\.google\.com\/spreadsheets\/.+/.test(url) || !/output=csv/.test(url)){ err.textContent = "Paste the published CSV link. It should end with output=csv."; return; }
+  if(sheets.some(s => s.name.toLowerCase() === name.toLowerCase())){ err.textContent = "That name is already used. Choose another."; return; }
+  sheets.push({ name, url }); saveSheets();
+  document.getElementById("nm").value = ""; document.getElementById("ul").value = "";
+  dlg.close(); refreshAll();
+};
+document.getElementById("refreshBtn").onclick = refreshAll;
+document.getElementById("interval").onchange = setTimer;
+
+setTimer(); render(); refreshAll();
+</script>
+</body>
+</html>
